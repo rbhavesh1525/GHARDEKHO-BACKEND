@@ -4,15 +4,16 @@ import jwt from "jsonwebtoken";
 
 export const sendOTP = async (req, res) => {
   try {
-    const { phone } = req.body;
+    let { phone } = req.body;
+
+    // Remove "+91" if included
+    phone = phone.replace("+91", "");
 
     const otp = Math.floor(100000 + Math.random() * 900000);
 
-    // SAVE OTP TEMPORARILY IN SESSION/MEMORY
     req.app.locals.otpStore = req.app.locals.otpStore || {};
     req.app.locals.otpStore[phone] = otp;
 
-    // SEND VIA MSG91
     await axios.post(
       `https://control.msg91.com/api/v5/otp`,
       {
@@ -21,34 +22,35 @@ export const sendOTP = async (req, res) => {
         otp,
       },
       {
-        headers: {
-          authkey: process.env.MSG91_AUTH_KEY,
-        },
+        headers: { authkey: process.env.MSG91_AUTH_KEY },
       }
     );
 
     return res.json({ success: true, message: "OTP sent successfully" });
 
   } catch (err) {
-    console.log(err);
-    return res.status(500).json({ success: false, message: "OTP sending failed" });
+    return res.status(500).json({
+      success: false,
+      message: "OTP sending failed",
+      error: err.message
+    });
   }
 };
 
 
 export const verifyOTP = async (req, res) => {
   try {
-    const { phone, otp, name, email, password } = req.body;
+    let { phone, otp, name, email, password } = req.body;
+
+    phone = phone.replace("+91", "");
 
     const otpStore = req.app.locals.otpStore || {};
     if (otpStore[phone] != otp) {
       return res.status(400).json({ success: false, message: "Invalid OTP" });
     }
 
-    // Remove OTP after verification
     delete otpStore[phone];
 
-    // Save user
     const user = await User.create({
       name,
       email,
@@ -56,7 +58,6 @@ export const verifyOTP = async (req, res) => {
       password,
     });
 
-    // JWT Token
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "7d"
     });
@@ -71,7 +72,10 @@ export const verifyOTP = async (req, res) => {
     return res.json({ success: true, user });
 
   } catch (err) {
-    console.log(err);
-    return res.status(500).json({ success: false, message: "OTP verification failed" });
+    return res.status(500).json({
+      success: false,
+      message: "OTP verification failed",
+      error: err.message
+    });
   }
 };

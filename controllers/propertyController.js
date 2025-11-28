@@ -31,14 +31,15 @@ export const createProperty = async (req, res) => {
   try {
     const payload = req.body;
 
-    // Basic server-side validation
-    if (!payload.title || !payload.owner_contact) {
-      return res.status(400).json({ success: false, message: "title and owner_contact are required" });
-    }
+    // Cloudinary uploaded image URLs
+    const uploadedImages = req.files?.map(file => file.path) || [];
 
-    // ensure images is array (frontend should send array)
-    if (payload.images && !Array.isArray(payload.images)) {
-      return res.status(400).json({ success: false, message: "images must be an array of URLs" });
+    // Validation
+    if (!payload.title || !payload.owner_contact) {
+      return res.status(400).json({
+        success: false,
+        message: "title and owner_contact are required",
+      });
     }
 
     const property = await Property.create({
@@ -56,22 +57,32 @@ export const createProperty = async (req, res) => {
       construction_year: payload.construction_year ? Number(payload.construction_year) : undefined,
       loading_docks: payload.loading_docks ? Number(payload.loading_docks) : undefined,
       power_kw: payload.power_kw ? Number(payload.power_kw) : undefined,
-      security_room: !!payload.security_room,
-      cctv: !!payload.cctv,
-      mezzanine_floor: !!payload.mezzanine_floor,
-      parking: !!payload.parking,
+      security_room: payload.security_room === "true",
+      cctv: payload.cctv === "true",
+      mezzanine_floor: payload.mezzanine_floor === "true",
+      parking: payload.parking === "true",
       owner_name: payload.owner_name || "",
       owner_contact: payload.owner_contact,
-      images: Array.isArray(payload.images) ? payload.images : [],
+      images: uploadedImages, // ⭐ Cloudinary URLs
       status: payload.status || "available",
     });
 
-    return res.status(201).json({ success: true, property });
+    return res.status(201).json({
+      success: true,
+      message: "Property created successfully!",
+      property,
+    });
+
   } catch (err) {
     console.error("createProperty error:", err);
-    return res.status(500).json({ success: false, message: "Internal server error", error: err.message });
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: err.message,
+    });
   }
 };
+
 
 /**
  * GET /api/properties
